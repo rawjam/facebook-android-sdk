@@ -16,19 +16,6 @@
 
 package com.facebook.android;
 
-import android.Manifest;
-import android.app.Activity;
-import android.content.*;
-import android.content.pm.PackageInfo;
-import android.content.pm.PackageManager;
-import android.content.pm.PackageManager.NameNotFoundException;
-import android.content.pm.ResolveInfo;
-import android.content.pm.Signature;
-import android.net.Uri;
-import android.os.*;
-import com.facebook.*;
-import com.facebook.Session.StatusCallback;
-
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.lang.ref.WeakReference;
@@ -36,6 +23,40 @@ import java.net.MalformedURLException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.ExecutionException;
+
+import android.Manifest;
+import android.app.Activity;
+import android.content.ComponentName;
+import android.content.ContentResolver;
+import android.content.Context;
+import android.content.Intent;
+import android.content.ServiceConnection;
+import android.content.pm.PackageInfo;
+import android.content.pm.PackageManager;
+import android.content.pm.PackageManager.NameNotFoundException;
+import android.content.pm.ResolveInfo;
+import android.content.pm.Signature;
+import android.net.Uri;
+import android.os.AsyncTask;
+import android.os.Bundle;
+import android.os.Handler;
+import android.os.IBinder;
+import android.os.Message;
+import android.os.Messenger;
+import android.os.RemoteException;
+
+import com.facebook.AccessTokenSource;
+import com.facebook.FacebookAuthorizationException;
+import com.facebook.FacebookOperationCanceledException;
+import com.facebook.LegacyHelper;
+import com.facebook.Request;
+import com.facebook.Session;
+import com.facebook.Session.StatusCallback;
+import com.facebook.SessionLoginBehavior;
+import com.facebook.SessionState;
+import com.facebook.Settings;
+import com.facebook.TokenCachingStrategy;
 
 /**
  * THIS CLASS SHOULD BE CONSIDERED DEPRECATED.
@@ -793,6 +814,31 @@ public class Facebook {
             MalformedURLException, IOException {
         return requestImpl(graphPath, params, httpMethod);
     }
+    
+    public class OpenUrlTask extends AsyncTask<Void, Void, String> {
+    	
+    	private String url;
+    	private String httpMethod;
+    	private Bundle params;
+    	
+    	public OpenUrlTask(String url, String method, Bundle params) {
+    		this.url = url;
+    		this.httpMethod = method;
+    		this.params = params;
+    	}
+
+		@SuppressWarnings("deprecation")
+		@Override
+		protected String doInBackground(Void... voids) {
+			String rt = null;
+			try {
+				return Util.openUrl(url, httpMethod, params);
+			} catch (Exception e) {
+				e.printStackTrace(); // TODO: Customise this generated block
+			}
+			return null;
+		}
+	}
 
     // Internal call to avoid deprecated warnings.
     @SuppressWarnings("deprecation")
@@ -803,7 +849,16 @@ public class Facebook {
             params.putString(TOKEN, getAccessToken());
         }
         String url = (graphPath != null) ? GRAPH_BASE_URL + graphPath : RESTSERVER_URL;
-        return Util.openUrl(url, httpMethod, params);
+        try {
+			return new OpenUrlTask(url, httpMethod, params).execute().get();
+		} catch (InterruptedException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (ExecutionException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		return null;
     }
 
     /**
